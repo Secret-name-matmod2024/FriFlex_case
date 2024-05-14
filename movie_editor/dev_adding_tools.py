@@ -1,10 +1,8 @@
 import subprocess
 import os
 
-def dict_to_subtitles(jsn):
-    pass # subtitles_list_of_dicts
 
-def process_video(input_video, music_file, fragments,  subtitles_list_of_dicts, output_video):
+def process_video(input_video, music_file, fragments, input_text, smiley_file, output_video):
     temp_cropped_videos = []
     for i, (start_time, end_time) in enumerate(fragments):
         temp_cropped_video = f"temp_cropped_video_{i}.mp4"
@@ -13,9 +11,10 @@ def process_video(input_video, music_file, fragments,  subtitles_list_of_dicts, 
     merge_videos(temp_cropped_videos, "temp_merged_video.mp4")
     remove_audio("temp_merged_video.mp4", "temp_video_without_audio.mp4")
     add_audio("temp_video_without_audio.mp4", music_file, "processed_video.mp4")
-    add_subtitles("processed_video.mp4",  subtitles_list_of_dicts, output_video)
+    add_text("processed_video.mp4", input_text, "withtext.mp4")
+    add_smiley("withtext.mp4", smiley_file, output_video)
     for temp_file in temp_cropped_videos + ["temp_merged_video.mp4", "temp_video_without_audio.mp4",
-                                            "processed_video.mp4"]:
+                                            "processed_video.mp4", "withtext.mp4"]:
         os.remove(temp_file)
 
 
@@ -44,6 +43,46 @@ def add_audio(input_video, audio_file, output_video):
     subprocess.run(command)
 
 
+# Пример
+"""
+изменение стандартного положения x
+add_design = {'x':'w-text_w'}
+"""
+
+
+def add_text(input_video, input_text, start_time, end_time, output_video, add_design={}):
+    base_design = {
+        'fontcolor': 'white',
+        'fontsize': '36',
+        'box': '1',
+        'boxcolor': 'black@0.5',
+        'boxborderw': '5',
+        'x': '(w-text_w)/2',
+        'y': 'main_h-50-text_h'
+    }
+    for key in add_design.keys():
+        base_design[key] = add_design[key]
+    design_cmd_params = f"drawtext=text='{input_text}':"
+    for param in base_design.keys():
+        design_cmd_params += f'{param}={base_design[param]}:'
+    design_cmd_params += f"enable='between(t,{start_time},{end_time})'"
+    command = ['ffmpeg', '-i', input_video, '-vf', design_cmd_params, '-codec:a', 'copy', output_video]
+    subprocess.run(command)
+
+
+def add_smiley(input_video, smiley_file, start_time, end_time, output_video, overlay='5:5'):
+    command = ['ffmpeg', '-i', input_video, '-i', smiley_file, '-filter_complex',
+               f"[1:v]scale=iw/5:ih/5 [small_smiley]; [0:v][small_smiley]overlay={overlay}:enable='between(t,{start_time},{end_time})'",
+               '-codec:a', 'copy', output_video]
+    subprocess.run(command)
+
+
+# Пример subtitles_list_of_dicts
+'''
+subtitles_list_of_dicts = [{'text':'fhsjdgljfsdklgjdlfs', 'start_t':5, 'end_t':10}, {'text':'AAAAAABBBB', 'start_t':15, 'end_t':20}]
+'''
+
+
 def add_subtitles(input_video, subtitles_list_of_dicts, output_video):
     input_text = ''
     subtitle_dict = {
@@ -51,13 +90,12 @@ def add_subtitles(input_video, subtitles_list_of_dicts, output_video):
         'fontsize': '24',
         'box': '1',
         'boxcolor': 'black@0.5',
-        'x':'(w-text_w)/2',
-        'y':'h-text_h'
+        'x': '(w-text_w)/2',
+        'y': 'h-text_h'
     }
     for subtitle in subtitles_list_of_dicts:
         for key in subtitle.keys():
             subtitle_dict[key] = subtitle[key]
-        #todo вместо формата сделать '{key}=dict[key]
         tmp = 'drawtext='
         for param in subtitle_dict.keys():
             if param == 'text':
@@ -67,16 +105,14 @@ def add_subtitles(input_video, subtitles_list_of_dicts, output_video):
             else:
                 tmp += f'{param}={subtitle_dict[param]}:'
         tmp += f"enable='between(t,{subtitle_dict['start_t']},{subtitle_dict['end_t']})',"
-        input_text += """drawtext=text='{text}':fontcolor={fontcolor}:fontsize={fontsize}:box={box}:boxcolor={boxcolor}:x={x}:y={y}:enable='between(t,{start_t},{end_t})',""".format(**subtitle_dict)
+        input_text += """drawtext=text='{text}':fontcolor={fontcolor}:fontsize={fontsize}:box={box}:boxcolor={boxcolor}:x={x}:y={y}:enable='between(t,{start_t},{end_t})',""".format(
+            **subtitle_dict)
     print(input_text)
     command = ['ffmpeg', '-i', input_video, '-vf', input_text, '-codec:a', 'copy', output_video]
     subprocess.run(command)
 
 
 fragments = [(10, 20), (40, 60)]
-subtitles_list_of_dicts = [{'text':'fhsjdgljfsdklgjdlfs', 'start_t':5, 'end_t':10}, {'text':'AAAAAABBBB', 'start_t':15, 'end_t':20}]
-#process_video("video.mp4", "audio.mp3", fragments,  subtitles_list_of_dicts, "processed_video_text.mp4")
-add_subtitles('aaaa', subtitles_list_of_dicts, 'vvv')
-#todo то же самое для add_text, add_smile
-
-"""ffmpeg.exe -i 20240513_132628.mp4 -vf "movie=20240513_132628.mp4, scale=250:-1[inner];[in][inner]overlay=10:10:enable='between(t,15,20)'[out]" -codec:a copy output.mp4"""
+input_text = "KKKKKKKKKKKKKKK"
+smiley_file = "smile.png"
+process_video("video.mp4", "audio.mp3", fragments, input_text, smiley_file, "video_all.mp4")
