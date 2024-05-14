@@ -1,0 +1,44 @@
+version: '3.8'
+
+services:
+  frontend:
+    build:
+      dockerfile: ./Dockerfile
+      context: ./src/frontend
+    ports:
+      - '8500:8500'
+
+  backend:
+    build:
+      dockerfile: ./Dockerfile
+      context: ./src/backend
+    ports:
+      - '8501:8501'
+
+  db:
+    image: postgres:15-alpine
+    volumes:
+      - dev-db-data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_DB=postgres #move to secret 
+      - POSTGRES_USER=postgres #move to secret 
+      - POSTGRES_PASSWORD=postgres #move to secret 
+    ports:
+      - 5432:5432
+
+  minio:
+    image: quay.io/minio/minio
+    command: server /data --console-address ":9090"
+    restart: always
+    ports:
+      - 9000:9000
+      - 9090:9090
+    volumes:
+      - ~/minio/data:/data
+    environment:
+      - MINIO_ROOT_USER=admin
+      - MINIO_ROOT_PASSWORD=Secure123$
+
+
+volumes:
+    dev-db-data:
